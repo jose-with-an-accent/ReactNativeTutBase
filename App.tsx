@@ -15,23 +15,38 @@ export default function App() {
     <NavigationContainer>
       <Stack.Navigator>
         <Stack.Screen name="Home" component={HomeScreen} />
-        
+        <Stack.Screen name="Details" component={DetailsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
+function DetailsScreen({ navigation, route }) {
+  const {data} = route.params;
+  console.log(data)
+  console.log(route.params)
 
+  return (
+    <View style={styles.container}>
+      <Image source={{uri: data.images.jpg.image_url}} style={styles.posterImage} />
+      <Text>{data.title_english}</Text>
+      <Text>{data.type}</Text>
+      <Text>{data.synopsis}</Text>
+    </View>
+  )
+}
 function HomeScreen({ navigation }) {
   const [anime, setAnime] = useState(null)
   const [favorites, setFavorites] = useState([])
   //to move between pages, use navigation.navigate(name)
 
   function addToFavorites(index) {
-    console.log(index)
-    let favs = favorites
-    favs.push(anime[index])
-    console.log(favs)
-    setFavorites(favs)
+    setFavorites(favorites.concat(anime[index]))
+    try {
+      AsyncStorage.setItem("favorites", JSON.stringify(favorites))
+    }
+    catch (e) {
+      console.log(e)
+    }
   }
   useEffect(() => {
     async function getData() {
@@ -41,25 +56,48 @@ function HomeScreen({ navigation }) {
       const dataJSON = await data.json()
 
       setAnime(dataJSON.data)
+
+      try {
+        const favoritesAsync = await AsyncStorage.getItem("favorites")
+        if (favoritesAsync !== null) {
+          setFavorites(JSON.parse(favoritesAsync))
+        }
+      } catch (e) {
+        console.error("There was an error setting favorites: ", e)
+      }
+
     }
     getData()
   }, [])
   return (
     <View style={styles.container}>
       <Text style={styles.largeHeading}>Favorites</Text>
-      <FlatList data={favorites} renderItem={({item, index}) => (
-        <Text>{index}</Text>
-      )} keyExtractor={(item, index) => index}/>
+      <FlatList numColumns={4} data={favorites} renderItem={({ item, index }) => (
+        <TouchableHighlight onPress={() => {
+          navigation.navigate("Details", {data: item})
+        }}>
+          <Image source={{ uri: item.images.jpg.image_url }} style={styles.posterImage} />
+        </TouchableHighlight>
+      )} keyExtractor={(item) => (item.mal_id)} />
+
+
       <Text style={styles.largeHeading}>Top Anime</Text>
-      <FlatList data={anime} renderItem={({item, index}) => (
+      <FlatList data={anime} renderItem={({ item, index }) => (
         <View style={styles.anime}>
-        <Text style={styles.title}>{item.title}</Text>
-        <Image source={{uri: item.images.jpg.image_url}} style={styles.posterImage} />
-        <TouchableOpacity onPress={() => {
-          addToFavorites(index)
-        }}><Text>Add</Text></TouchableOpacity>
+          <Text style={styles.title}>{item.title}</Text>
+          <Image source={{ uri: item.images.jpg.image_url }} style={styles.posterImage} />
+          <TouchableOpacity onPress={() => {
+            addToFavorites(index)
+          }}>
+            <Text>Add</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => {
+            navigation.navigate("Details")
+          }}>
+            <Text>View Details</Text>
+          </TouchableOpacity>
         </View>
-      )} keyExtractor={(item) => {item.mal_id}}/>
+      )} keyExtractor={(item) => (item.mal_id)} />
     </View>
   )
 }
@@ -79,8 +117,8 @@ const styles = StyleSheet.create({
     color: 'blue'
   },
   posterImage: {
-    width: 200,
-    height: 300
+    minWidth: 100,
+    minHeight: 300,
   },
   anime: {
     backgroundColor: 'white',
